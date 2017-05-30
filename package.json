@@ -1,5 +1,5 @@
 {
-	"name": "jsep",
+	"name": "@visi-one/jsep",
 	"version": "0.3.1",
 	"description": "a tiny JavaScript expression parser",
 	"author": "Stephen Oney <swloney@gmail.com> (http://from.so/)",
@@ -7,7 +7,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/soney/jsep.git"
+		"url": "git+ssh://git@github.com/VISI-ONE/jsep.git"
 	},
 	"main": "build/jsep.js",
 	"typings": "typings/tsd.d.ts",

@@ -7,7 +7,7 @@
 	'use strict';
 	// Node Types
 	// ----------
-	
+
 	// This is the full set of types that any JSEP node can be.
 	// Store them here to save space when minified
 	var COMPOUND = 'Compound',
@@ -43,7 +43,7 @@
 
 	// Operations
 	// ----------
-	
+
 	// Set `t` to `true` to save space (when minified, not gzipped)
 		t = true,
 	// Use a quickly-accessible map to store all of the unary operators
@@ -55,7 +55,7 @@
 		binary_ops = {
 			'||': 1, '&&': 2, '|': 3,  '^': 4,  '&': 5,
 			'==': 6, '!=': 6, '===': 6, '!==': 6,
-			'<': 7,  '>': 7,  '<=': 7,  '>=': 7, 
+			'<': 7,  '>': 7,  '<=': 7,  '>=': 7,
 			'<<':8,  '>>': 8, '>>>': 8,
 			'+': 9, '-': 9,
 			'*': 10, '/': 10, '%': 10
@@ -132,11 +132,11 @@
 				gobbleSpaces = function() {
 					var ch = exprICode(index);
 					// space or tab
-					while(ch === 32 || ch === 9) {
+					while(ch === 32 || ch === 9 || ch === 10 || ch === 13) {
 						ch = exprICode(++index);
 					}
 				},
-				
+
 				// The main parsing function. Much of this code is dedicated to ternary expressions
 				gobbleExpression = function() {
 					var test = gobbleBinaryExpression(),
@@ -178,7 +178,13 @@
 					gobbleSpaces();
 					var biop, to_check = expr.substr(index, max_binop_len), tc_len = to_check.length;
 					while(tc_len > 0) {
-						if(binary_ops.hasOwnProperty(to_check)) {
+						// Don't accept a binary op when it is an identifier.
+						// Binary ops that start with a identifier-valid character must be followed
+						// by a non identifier-part valid character
+						if(binary_ops.hasOwnProperty(to_check) && (
+							!isIdentifierStart(exprICode(index)) ||
+							(index+to_check.length< expr.length && !isIdentifierPart(exprICode(index+to_check.length)))
+						)) {
 							index += tc_len;
 							return to_check;
 						}
@@ -190,7 +196,7 @@
 				// This function is responsible for gobbling an individual expression,
 				// e.g. `1`, `1+2`, `a+(b*2)-Math.sqrt(2)`
 				gobbleBinaryExpression = function() {
-					var ch_i, node, biop, prec, stack, biop_info, left, right, i;
+					var ch_i, node, biop, prec, stack, biop_info, left, right, i, cur_biop;
 
 					// First, try to get the leftmost thing
 					// Then, check to see if there's a binary operator operating on that leftmost thing
@@ -221,6 +227,7 @@
 						}
 						biop_info = { value: biop, prec: prec };
 
+						cur_biop = biop;
 						// Reduce: make a binary expression from the three topmost entries.
 						while ((stack.length > 2) && (prec <= stack[stack.length - 2].prec)) {
 							right = stack.pop();
@@ -232,7 +239,7 @@
 
 						node = gobbleToken();
 						if(!node) {
-							throwError("Expected expression after " + biop, index);
+							throwError("Expected expression after " + cur_biop, index);
 						}
 						stack.push(biop_info, node);
 					}
@@ -240,7 +247,7 @@
 					i = stack.length - 1;
 					node = stack[i];
 					while(i > 1) {
-						node = createBinaryExpression(stack[i - 1].value, stack[i - 2], node); 
+						node = createBinaryExpression(stack[i - 1].value, stack[i - 2], node);
 						i -= 2;
 					}
 					return node;
@@ -250,7 +257,7 @@
 				// e.g. `foo.bar(baz)`, `1`, `"abc"`, `(a % 2)` (because it's in parenthesis)
 				gobbleToken = function() {
 					var ch, to_check, tc_len;
-					
+
 					gobbleSpaces();
 					ch = exprICode(index);
 
@@ -260,16 +267,19 @@
 					} else if(ch === SQUOTE_CODE || ch === DQUOTE_CODE) {
 						// Single or double quotes
 						return gobbleStringLiteral();
-					} else if(isIdentifierStart(ch) || ch === OPAREN_CODE) { // open parenthesis
-						// `foo`, `bar.baz`
-						return gobbleVariable();
 					} else if (ch === OBRACK_CODE) {
 						return gobbleArray();
 					} else {
 						to_check = expr.substr(index, max_unop_len);
 						tc_len = to_check.length;
 						while(tc_len > 0) {
-							if(unary_ops.hasOwnProperty(to_check)) {
+						// Don't accept an unary op when it is an identifier.
+						// Unary ops that start with a identifier-valid character must be followed
+						// by a non identifier-part valid character
+							if(unary_ops.hasOwnProperty(to_check) && (
+								!isIdentifierStart(exprICode(index)) ||
+								(index+to_check.length < expr.length && !isIdentifierPart(exprICode(index+to_check.length)))
+							)) {
 								index += tc_len;
 								return {
 									type: UNARY_EXP,
@@ -280,9 +290,14 @@
 							}
 							to_check = to_check.substr(0, --tc_len);
 						}
-						
-						return false;
+
+						if (isIdentifierStart(ch) || ch === OPAREN_CODE) { // open parenthesis
+							// `foo`, `bar.baz`
+							return gobbleVariable();
+						}
 					}
+
+					return false;
 				},
 				// Parse simple numeric literals: `12`, `3.4`, `.5`. Do this by using a string to
 				// keep track of everything in the numeric literal and then calling `parseFloat` on that string
@@ -299,7 +314,7 @@
 							number += exprI(index++);
 						}
 					}
-					
+
 					ch = exprI(index);
 					if(ch === 'e' || ch === 'E') { // exponent marker
 						number += exprI(index++);
@@ -314,7 +329,7 @@
 							throwError('Expected exponent (' + number + exprI(index) + ')', index);
 						}
 					}
-					
+
 
 					chCode = exprICode(index);
 					// Check to make sure this isn't a variable name that start with a number (123abc)
@@ -352,7 +367,7 @@
 								case 'b': str += '\b'; break;
 								case 'f': str += '\f'; break;
 								case 'v': str += '\x0B'; break;
-								default : str += '\\' + ch;
+								default : str += ch;
 							}
 						} else {
 							str += ch;
@@ -369,7 +384,7 @@
 						raw: quote + str + quote
 					};
 				},
-				
+
 				// Gobbles only identifiers
 				// e.g.: `foo`, `_value`, `$x1`
 				// Also, this function checks if that identifier is a literal:
@@ -416,15 +431,30 @@
 				// e.g. `foo(bar, baz)`, `my_func()`, or `[bar, baz]`
 				gobbleArguments = function(termination) {
 					var ch_i, args = [], node, closed = false;
+					var separator_count = 0;
 					while(index < length) {
 						gobbleSpaces();
 						ch_i = exprICode(index);
 						if(ch_i === termination) { // done parsing
 							closed = true;
 							index++;
+							if(termination === CPAREN_CODE && separator_count && separator_count >= args.length){
+								throwError('Unexpected token ' + String.fromCharCode(termination), index);
+							}
 							break;
 						} else if (ch_i === COMMA_CODE) { // between expressions
 							index++;
+							separator_count++;
+							if(separator_count !== args.length) { // missing argument
+								if(termination === CPAREN_CODE) {
+									throwError('Unexpected token ,', index);
+								}
+								else if(termination === CBRACK_CODE) {
+									for(var arg = args.length; arg< separator_count; arg++) {
+										args.push(null);
+									}
+								}
+							}
 						} else {
 							node = gobbleExpression();
 							if(!node || node.type === COMPOUND) {
@@ -446,7 +476,7 @@
 				gobbleVariable = function() {
 					var ch_i, node;
 					ch_i = exprICode(index);
-						
+
 					if(ch_i === OPAREN_CODE) {
 						node = gobbleGroup();
 					} else {
@@ -520,7 +550,7 @@
 				},
 
 				nodes = [], ch_i, node;
-				
+
 			while(index < length) {
 				ch_i = exprICode(index);
 
@@ -608,7 +638,7 @@
 	jsep.removeAllUnaryOps = function() {
 		unary_ops = {};
 		max_unop_len = 0;
-		
+
 		return this;
 	};
 
@@ -632,7 +662,7 @@
 	jsep.removeAllBinaryOps = function() {
 		binary_ops = {};
 		max_binop_len = 0;
-		
+
 		return this;
 	};
 
@@ -652,7 +682,7 @@
 	 */
 	jsep.removeAllLiterals = function() {
 		literals = {};
-		
+
 		return this;
 	};
 

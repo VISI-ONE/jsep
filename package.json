@@ -1,6 +1,6 @@
 {
 	"name": "@visi-one/jsep",
-	"version": "0.3.7",
+	"version": "0.3.8",
 	"description": "a tiny JavaScript expression parser",
 	"author": "Stephen Oney <swloney@gmail.com> (http://from.so/)",
 	"homepage": "http://jsep.from.so/",
